@@ -2,6 +2,7 @@
 MASTER-v3: Viết bài → Facebook
 Flow: Topics DB → SerpAPI → Claude (chọn topic) → Claude (viết bài) →
       Viral check → Chọn ảnh → Post Facebook → Ghi Sheets
+v3.1: FB fail → gửi overlay image về Telegram để đăng thủ công
 """
 import os
 import asyncio
