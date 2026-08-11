@@ -215,12 +215,26 @@ async def generate_and_upload_overlay(
     Gọi ensure_fonts() một lần lúc startup để có font tốt nhất.
     """
     try:
+        logger.info("🖼️ Bắt đầu tạo overlay: service=%s hook=%s", service, hook_text[:40])
+
+        # Kiểm tra R2 config
+        r2_endpoint = os.getenv("R2_ENDPOINT_URL")
+        r2_key      = os.getenv("R2_ACCESS_KEY_ID")
+        r2_secret   = os.getenv("R2_SECRET_ACCESS_KEY")
+        r2_bucket   = os.getenv("R2_BUCKET_NAME", "ldt-images")
+        logger.info("🔧 R2 config: endpoint=%s bucket=%s key_ok=%s secret_ok=%s",
+                    r2_endpoint, r2_bucket, bool(r2_key), bool(r2_secret))
+
+        # Tạo ảnh
         loop = asyncio.get_event_loop()
         img_bytes = await loop.run_in_executor(
             None, make_overlay_image, hook_text, service, brand
         )
+        logger.info("✅ Ảnh tạo xong: %d bytes", len(img_bytes))
+
+        # Upload R2
         url = await upload_overlay_to_r2(img_bytes, service)
-        logger.info("✅ Overlay image: %s", url)
+        logger.info("✅ Overlay uploaded: %s", url)
         return url
 
     except Exception as e:
