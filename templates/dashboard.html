@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luật Danh Thị — Quản lý nội dung</title>
+<style>
+:root {
+  --primary:#1a3a5c; --accent:#c0392b; --gold:#d4a017;
+  --bg:#f0f2f5; --card:#fff; --text:#1a1a2e; --muted:#6b7280;
+  --border:#e5e7eb; --green:#16a34a; --orange:#ea580c; --blue:#2563eb;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* Header */
+.header{background:var(--primary);color:#fff;padding:14px 24px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.header h1{font-size:1.1rem;font-weight:700}
+.header .sub{font-size:.75rem;opacity:.65}
+.badge{margin-left:auto;padding:4px 14px;border-radius:20px;font-size:.75rem;font-weight:600;background:var(--green)}
+.badge.loading{background:var(--orange)}
+
+/* Nav tabs */
+.nav-tabs{background:#fff;border-bottom:2px solid var(--border);display:flex;padding:0 24px;gap:0}
+.tab{padding:12px 20px;font-size:.88rem;font-weight:600;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px;transition:.15s}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.tab:hover:not(.active){color:var(--text)}
+
+/* Pages */
+.page{display:none;padding:20px 24px}
+.page.active{display:block}
+
+/* Stats row */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:var(--card);border-radius:10px;padding:16px;text-align:center;border:1px solid var(--border);border-top:3px solid var(--primary)}
+.stat .n{font-size:1.8rem;font-weight:800;color:var(--primary)}
+.stat .l{font-size:.75rem;color:var(--muted);margin-top:3px}
+.stat.s-ly{border-top-color:#dc2626}.stat.s-dd{border-top-color:#16a34a}.stat.s-hs{border-top-color:#2563eb}
+.stat.s-wv{border-top-color:#ea580c}.stat.s-rv{border-top-color:#7c3aed}.stat.s-pv{border-top-color:#16a34a}
+
+/* Filters */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.filt{padding:5px 14px;border-radius:20px;font-size:.8rem;font-weight:600;cursor:pointer;background:var(--bg);border:1px solid var(--border);color:var(--muted);transition:.15s}
+.filt.active,.filt:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* Kanban */
+.kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:768px){.kanban{grid-template-columns:1fr}}
+.col{background:#f8fafc;border-radius:12px;border:1px solid var(--border)}
+.col-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.col-head h3{font-size:.9rem;font-weight:700}
+.col-count{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:2px 10px;font-size:.78rem;font-weight:600}
+.col-body{padding:12px;min-height:200px;display:flex;flex-direction:column;gap:10px}
+
+/* Card */
+.vcard{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:14px;cursor:pointer;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.vcard:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-2px)}
+.vcard .vc-top{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.7rem;font-weight:700}
+.tag-fb{background:#dbeafe;color:#1d4ed8}.tag-tk{background:#fce7f3;color:#9d174d}
+.tag-ytb{background:#fee2e2;color:#991b1b}
+.tag-ly{background:#fef2f2;color:#991b1b}.tag-dd{background:#f0fdf4;color:#166534}
+.tag-hs{background:#eff6ff;color:#1e40af}.tag-hd{background:#fef9c3;color:#713f12}
+.tag-ld{background:#fdf4ff;color:#6b21a8}
+.vcard .vc-title{font-size:.88rem;font-weight:600;line-height:1.3;margin-bottom:6px}
+.vcard .vc-meta{font-size:.75rem;color:var(--muted)}
+.vcard .vc-actions{display:flex;gap:6px;margin-top:10px}
+.btn-sm{padding:5px 12px;border-radius:6px;font-size:.76rem;font-weight:600;border:none;cursor:pointer;transition:.1s}
+.btn-r2{background:#f0fdf4;color:#166534}.btn-r2:hover{background:#dcfce7}
+.btn-dang{background:#eff6ff;color:#1e40af}.btn-dang:hover{background:#dbeafe}
+.btn-view{background:#f9fafb;color:var(--muted)}.btn-view:hover{background:var(--bg)}
+.empty-col{text-align:center;color:var(--muted);font-size:.83rem;padding:30px 10px;line-height:1.6}
+
+/* Quick actions */
+.quick{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:20px;margin-bottom:20px}
+.quick h2{font-size:.95rem;font-weight:700;margin-bottom:14px}
+.action-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.action-btn{padding:12px 16px;border-radius:10px;border:none;cursor:pointer;font-size:.85rem;font-weight:600;text-align:left;transition:.15s;line-height:1.4}
+.action-btn:hover{filter:brightness(.93);transform:translateY(-1px)}
+.action-btn .sub{font-size:.72rem;opacity:.7;font-weight:400;display:block;margin-top:2px}
+.a-lyfb{background:#fef2f2;color:#991b1b}.a-ddfb{background:#f0fdf4;color:#166534}
+.a-hsfb{background:#eff6ff;color:#1e40af}.a-lytk{background:#fce7f3;color:#9d174d}
+.a-ddtk{background:#ecfdf5;color:#065f46}.a-hstk{background:#eef2ff;color:#3730a3}
+
+/* Image factory */
+.img-form{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.img-form select,.img-form input{padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:.85rem;background:#fff}
+.img-form input[type=number]{width:80px}
+.btn-img{background:#fef9c3;color:#713f12;padding:9px 18px;border-radius:8px;border:none;font-size:.85rem;font-weight:600;cursor:pointer}
+.btn-img:hover{background:#fef08a}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:none;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:14px;padding:24px;max-width:560px;width:calc(100% - 32px);max-height:90vh;overflow-y:auto}
+.modal h3{font-size:1rem;font-weight:700;margin-bottom:16px}
+.modal .field{margin-bottom:12px}
+.modal label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:4px}
+.modal input,.modal textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:.88rem;font-family:inherit}
+.modal textarea{resize:vertical;min-height:80px}
+.modal .row{display:flex;gap:10px}
+.modal .row>*{flex:1}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+.btn-cancel{padding:9px 20px;border-radius:8px;border:1px solid var(--border);background:#fff;cursor:pointer;font-size:.88rem}
+.btn-save{padding:9px 20px;border-radius:8px;border:none;background:var(--primary);color:#fff;cursor:pointer;font-size:.88rem;font-weight:600}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:#1a1a2e;color:#fff;padding:12px 20px;border-radius:8px;font-size:.88rem;z-index:999;display:none;animation:slideUp .2s}
+@keyframes slideUp{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* Commands ref */
+.cmd-section{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:20px}
+.cmd-section h2{font-size:.95rem;font-weight:700;margin-bottom:16px}
+.cmd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px}
+.cmd-group h3{font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+code{background:#f1f5f9;padding:4px 8px;border-radius:5px;font-size:.82rem;display:block;margin-bottom:4px;cursor:pointer;transition:.1s}
+code:hover{background:#e2e8f0}
+.cmd-note{font-size:.78rem;color:var(--muted);line-height:1.5;margin-top:6px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span style="font-size:1.5rem">⚖️</span>
+  <div><div style="font-weight:700;font-size:1rem">Luật Danh Thị</div><div class="sub">Quản lý nội dung</div></div>
+  <div id="tg-status" style="font-size:.8rem;opacity:.7;margin-left:12px">💬 Telegram</div>
+  <div class="badge loading" id="status-badge">Đang kết nối...</div>
+</div>
+
+<div class="nav-tabs">
+  <div class="tab active" onclick="switchTab('kanban')">📋 Quản lý video</div>
+  <div class="tab" onclick="switchTab('images')">🖼️ Kho ảnh</div>
+  <div class="tab" onclick="switchTab('commands')">💬 Lệnh Telegram</div>
+</div>
+
+<!-- ── TAB: KANBAN ── -->
+<div class="page active" id="tab-kanban">
+
+  <div class="quick">
+    <h2>🚀 Tạo nội dung nhanh</h2>
+    <div class="action-grid">
+      <button class="action-btn a-lyfb" onclick="triggerTaobai('lyhonfb')">💔 Ly Hôn — Facebook<span class="sub">Viết kịch bản + audio TTS</span></button>
+      <button class="action-btn a-ddfb" onclick="triggerTaobai('datdaifb')">🏠 Đất Đai — Facebook<span class="sub">Viết kịch bản + audio TTS</span></button>
+      <button class="action-btn a-hsfb" onclick="triggerTaobai('hinhsufb')">⚖️ Hình Sự — Facebook<span class="sub">Viết kịch bản + audio TTS</span></button>
+      <button class="action-btn a-lytk" onclick="triggerTaobai('lyhontk')">💔 Ly Hôn — TikTok<span class="sub">Viết kịch bản + audio TTS</span></button>
+      <button class="action-btn a-ddtk" onclick="triggerTaobai('datdaitk')">🏠 Đất Đai — TikTok<span class="sub">Viết kịch bản + audio TTS</span></button>
+      <button class="action-btn a-hstk" onclick="triggerTaobai('hinhsutk')">⚖️ Hình Sự — TikTok<span class="sub">Viết kịch bản + audio TTS</span></button>
+    </div>
+    <p style="font-size:.76rem;color:var(--muted);margin-top:10px">* Lệnh được copy → paste vào Telegram bot để kích hoạt AI.</p>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <span style="font-size:.8rem;font-weight:600;color:var(--muted);padding:5px 0">Lọc:</span>
+    <div class="filt active" onclick="filterVideos('all',this)">Tất cả</div>
+    <div class="filt" onclick="filterVideos('facebook',this)">📘 Facebook</div>
+    <div class="filt" onclick="filterVideos('tiktok',this)">🎵 TikTok</div>
+    <div class="filt" onclick="filterVideos('youtube',this)">▶️ YouTube</div>
+    <div class="filt" style="margin-left:8px" onclick="filterVideos('ly_hon',this)">💔 Ly hôn</div>
+    <div class="filt" onclick="filterVideos('dat_dai',this)">🏠 Đất đai</div>
+    <div class="filt" onclick="filterVideos('hinh_su',this)">⚖️ Hình sự</div>
+  </div>
+
+  <!-- Kanban -->
+  <div class="kanban">
+    <div class="col">
+      <div class="col-head">
+        <h3>📝 Chờ tạo video</h3>
+        <span class="col-count" id="cnt-waiting">0</span>
+      </div>
+      <div class="col-body" id="col-waiting">
+        <div class="empty-col">Chưa có bài nào.<br>Nhắn <b>taobai lyhonfb</b><br>qua Telegram hoặc bấm nút trên.</div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="col-head">
+        <h3>🎬 Sẵn sàng đăng</h3>
+        <span class="col-count" id="cnt-ready">0</span>
+      </div>
+      <div class="col-body" id="col-ready">
+        <div class="empty-col">Sau khi có video từ HeyGen,<br>nhắn <b>/r2 ID url</b><br>để chuyển bài sang đây.</div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="col-head">
+        <h3>✅ Đã đăng</h3>
+        <span class="col-count" id="cnt-posted">0</span>
+      </div>
+      <div class="col-body" id="col-posted">
+        <div class="empty-col">Bài đăng thành công<br>sẽ hiện ở đây.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── TAB: IMAGES ── -->
+<div class="page" id="tab-images">
+  <div class="stats" id="img-stats">
+    <div class="stat s-ly"><div class="n" id="is-ly">—</div><div class="l">💔 Ly Hôn</div></div>
+    <div class="stat s-dd"><div class="n" id="is-dd">—</div><div class="l">🏠 Đất Đai</div></div>
+    <div class="stat s-hs"><div class="n" id="is-hs">—</div><div class="l">⚖️ Hình Sự</div></div>
+    <div class="stat" style="border-top-color:var(--gold)"><div class="n" id="is-total">—</div><div class="l">📁 Tổng ảnh</div></div>
+  </div>
+
+  <div class="quick">
+    <h2>🖼️ Tạo ảnh kho</h2>
+    <div class="img-form">
+      <select id="img-cat">
+        <option value="lyhon">💔 Ly Hôn</option>
+        <option value="datdai">🏠 Đất Đai</option>
+        <option value="hinhsu">⚖️ Hình Sự</option>
+      </select>
+      <input type="number" id="img-count" value="20" min="1" max="100">
+      <button class="btn-img" onclick="copyImgCmd()">📋 Copy lệnh tạo ảnh</button>
+    </div>
+    <p style="font-size:.75rem;color:var(--muted);margin-top:8px">Paste lệnh vào Telegram bot tạo ảnh (@luatdanhthi_images_bot). Tối đa 100 ảnh/lần.</p>
+  </div>
+</div>
+
+<!-- ── TAB: COMMANDS ── -->
+<div class="page" id="tab-commands">
+  <div class="cmd-section">
+    <h2>💬 Lệnh Telegram</h2>
+    <div class="cmd-grid">
+      <div class="cmd-group">
+        <h3>Bot viết bài + video (Bot chính)</h3>
+        <code onclick="copyCmd(this)">viết bài ly hôn</code>
+        <code onclick="copyCmd(this)">viết bài đất đai</code>
+        <code onclick="copyCmd(this)">viết bài hình sự</code>
+        <div class="cmd-note">→ Claude viết bài Facebook kèm ảnh, tự đăng ngay</div>
+      </div>
+      <div class="cmd-group">
+        <h3>Tạo nội dung video — Facebook</h3>
+        <code onclick="copyCmd(this)">taobai lyhonfb</code>
+        <code onclick="copyCmd(this)">taobai datdaifb</code>
+        <code onclick="copyCmd(this)">taobai hinhsufb</code>
+        <code onclick="copyCmd(this)">taobai hopdongfb</code>
+        <div class="cmd-note">→ Nhận tiêu đề + caption + kịch bản + file MP3</div>
+      </div>
+      <div class="cmd-group">
+        <h3>Tạo nội dung video — TikTok</h3>
+        <code onclick="copyCmd(this)">taobai lyhontk</code>
+        <code onclick="copyCmd(this)">taobai datdaitk</code>
+        <code onclick="copyCmd(this)">taobai hinhsutk</code>
+        <code onclick="copyCmd(this)">taobai ladongtk</code>
+        <div class="cmd-note">→ Kịch bản ngắn 30-45s phù hợp TikTok</div>
+      </div>
+      <div class="cmd-group">
+        <h3>Sau khi có video từ HeyGen</h3>
+        <code onclick="copyCmd(this)">/r2 LHFB123456 https://link.mp4</code>
+        <code onclick="copyCmd(this)">/dang LHFB123456</code>
+        <div class="cmd-note">Bước 1: Upload video lên R2 → copy link<br>Bước 2: /r2 để lưu link<br>Bước 3: /dang để đăng lên Facebook</div>
+      </div>
+      <div class="cmd-group">
+        <h3>Bot tạo ảnh (@luatdanhthi_images_bot)</h3>
+        <code onclick="copyCmd(this)">/taoanh lyhon 50</code>
+        <code onclick="copyCmd(this)">/taoanh datdai 50</code>
+        <code onclick="copyCmd(this)">/taoanh hinhsu 50</code>
+        <div class="cmd-note">Tạo ảnh AI lưu vào kho. Tối đa 100/lần.<br>3 lần/ngày = 150 ảnh/ngày.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal /r2 -->
+<div class="modal-overlay" id="modal-r2">
+  <div class="modal">
+    <h3>🎬 Thêm link video</h3>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:16px">Sau khi xuất video từ HeyGen và upload lên R2, dán link vào đây.</p>
+    <div class="field"><label>ID bài viết</label><input id="r2-id" readonly></div>
+    <div class="field"><label>Link video (R2 / CDN) *</label><input id="r2-url" placeholder="https://pub-xxx.r2.dev/..."></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-r2')">Huỷ</button>
+      <button class="btn-save" onclick="saveR2()">💾 Lưu link video</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal /dang confirm -->
+<div class="modal-overlay" id="modal-dang">
+  <div class="modal">
+    <h3>📤 Xác nhận đăng bài</h3>
+    <div id="dang-preview" style="background:#f8fafc;border-radius:8px;padding:14px;margin-bottom:16px;font-size:.85rem;line-height:1.6"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-dang')">Huỷ</button>
+      <button class="btn-save" onclick="confirmDang()" style="background:var(--green)">📤 Đăng ngay</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const ADMIN_CHAT_ID = "";  // Điền Telegram chat_id của bạn
+
+let allVideos = [];
+let activeFilter = 'all';
+let currentVid = null;
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const names = ['kanban','images','commands'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+// ── Load data ─────────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const res = await fetch('/api/stats');
+    const d   = await res.json();
+    if (!d.ok) throw new Error(d.error);
+
+    // Image stats
+    document.getElementById('is-ly').textContent    = d.stats.ly_hon  ?? '—';
+    document.getElementById('is-dd').textContent    = d.stats.dat_dai ?? '—';
+    document.getElementById('is-hs').textContent    = d.stats.hinh_su ?? '—';
+    document.getElementById('is-total').textContent = d.stats.total   ?? '—';
+
+    allVideos = d.videos || [];
+    renderKanban(allVideos);
+
+    document.getElementById('status-badge').textContent = '✅ Online';
+    document.getElementById('status-badge').classList.remove('loading');
+  } catch(e) {
+    document.getElementById('status-badge').textContent = '❌ Lỗi';
+    console.error(e);
+  }
+}
+
+// ── Kanban render ─────────────────────────────────────────────────────────────
+const TOPIC_ICON  = {ly_hon:'💔',dat_dai:'🏠',hinh_su:'⚖️',hop_dong:'📋',lao_dong:'👷',tai_san:'💰',nuoi_con:'👶',doanh_nghiep:'🏢'};
+const TOPIC_LABEL = {ly_hon:'Ly Hôn',dat_dai:'Đất Đai',hinh_su:'Hình Sự',hop_dong:'Hợp Đồng',lao_dong:'Lao Động',tai_san:'Tài Sản',nuoi_con:'Nuôi Con',doanh_nghiep:'Doanh Nghiệp'};
+const PLAT_LABEL  = {facebook:'📘 FB',tiktok:'🎵 TikTok',youtube:'▶️ YTB'};
+const PLAT_TAG    = {facebook:'tag-fb',tiktok:'tag-tk',youtube:'tag-ytb'};
+const TOPIC_TAG   = {ly_hon:'tag-ly',dat_dai:'tag-dd',hinh_su:'tag-hs',hop_dong:'tag-hd',lao_dong:'tag-ld'};
+
+function filterVideos(f, el) {
+  activeFilter = f;
+  document.querySelectorAll('.filt').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+  renderKanban(allVideos);
+}
+
+function applyFilter(videos) {
+  if (activeFilter === 'all') return videos;
+  return videos.filter(v => v.platform === activeFilter || v.topic === activeFilter);
+}
+
+function renderKanban(videos) {
+  const filtered = applyFilter(videos);
+  const waiting  = filtered.filter(v => v.status === 'waiting_video');
+  const ready    = filtered.filter(v => v.status === 'ready');
+  const posted   = filtered.filter(v => v.status === 'posted');
+
+  document.getElementById('cnt-waiting').textContent = waiting.length;
+  document.getElementById('cnt-ready').textContent   = ready.length;
+  document.getElementById('cnt-posted').textContent  = posted.length;
+
+  renderCol('col-waiting', waiting, 'waiting');
+  renderCol('col-ready',   ready,   'ready');
+  renderCol('col-posted',  posted,  'posted');
+}
+
+function renderCol(colId, items, type) {
+  const el = document.getElementById(colId);
+  if (!items.length) {
+    const msgs = {
+      waiting: 'Chưa có bài nào.<br>Nhắn <b>taobai lyhonfb</b><br>qua Telegram.',
+      ready:   'Sau khi có video,<br>nhắn <b>/r2 ID url</b>.',
+      posted:  'Bài đăng thành công<br>sẽ hiện ở đây.'
+    };
+    el.innerHTML = `<div class="empty-col">${msgs[type]}</div>`;
+    return;
+  }
+  el.innerHTML = items.map(v => cardHtml(v, type)).join('');
+}
+
+function cardHtml(v, type) {
+  const pTag  = `<span class="tag ${PLAT_TAG[v.platform]||'tag-fb'}">${PLAT_LABEL[v.platform]||v.platform}</span>`;
+  const tTag  = `<span class="tag ${TOPIC_TAG[v.topic]||''}">${TOPIC_ICON[v.topic]||''} ${TOPIC_LABEL[v.topic]||v.topic}</span>`;
+  const id    = v.id || '';
+  const date  = (v.created_at||'').substring(5); // MM-DD
+
+  let actions = '';
+  if (type === 'waiting') {
+    actions = `<button class="btn-sm btn-r2" onclick="openR2('${id}')">🎬 Thêm video</button>`;
+  } else if (type === 'ready') {
+    actions = `
+      <button class="btn-sm btn-dang" onclick="openDang(${JSON.stringify(v).replace(/"/g,'&quot;')})">📤 Đăng ngay</button>
+      <button class="btn-sm btn-r2" onclick="openR2('${id}')">🔗 Đổi link</button>`;
+  } else if (type === 'posted' && v.fb_post_id) {
+    actions = `<a href="https://facebook.com/${v.fb_post_id}" target="_blank"><button class="btn-sm btn-view">👁️ Xem bài</button></a>`;
+  }
+
+  return `<div class="vcard">
+    <div class="vc-top">${pTag}${tTag}<span style="margin-left:auto;font-size:.7rem;color:var(--muted)">${date}</span></div>
+    <div class="vc-title">${v.title || '(Chưa có tiêu đề)'}</div>
+    <div class="vc-meta">🆔 ${id}</div>
+    ${actions ? `<div class="vc-actions">${actions}</div>` : ''}
+  </div>`;
+}
+
+// ── Modal R2 ──────────────────────────────────────────────────────────────────
+function openR2(id) {
+  document.getElementById('r2-id').value  = id;
+  document.getElementById('r2-url').value = '';
+  document.getElementById('modal-r2').classList.add('open');
+}
+
+async function saveR2() {
+  const id  = document.getElementById('r2-id').value;
+  const url = document.getElementById('r2-url').value.trim();
+  if (!url) { showToast('Nhập link video R2'); return; }
+
+  const cmd = `/r2 ${id} ${url}`;
+  copyText(cmd);
+  showToast(`📋 Đã copy: "${cmd.substring(0,50)}..." — Paste vào Telegram bot!`, 5000);
+  closeModal('modal-r2');
+  setTimeout(loadStats, 3000);
+}
+
+// ── Modal Dang ────────────────────────────────────────────────────────────────
+function openDang(v) {
+  currentVid = v;
+  document.getElementById('dang-preview').innerHTML = `
+    <b>Tiêu đề:</b> ${v.title}<br>
+    <b>ID:</b> <code>${v.id}</code><br>
+    <b>Platform:</b> ${PLAT_LABEL[v.platform]||v.platform}<br>
+    <b>Video:</b> <a href="${v.video_url}" target="_blank">Xem</a>
+  `;
+  document.getElementById('modal-dang').classList.add('open');
+}
+
+async function confirmDang() {
+  if (!currentVid) return;
+  const cmd = `/dang ${currentVid.id}`;
+  copyText(cmd);
+  showToast(`📋 Đã copy: "${cmd}" — Paste vào Telegram bot!`, 5000);
+  closeModal('modal-dang');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── Quick actions ─────────────────────────────────────────────────────────────
+function triggerTaobai(combo) {
+  const cmd = `taobai ${combo}`;
+  copyText(cmd);
+  showToast(`📋 Đã copy: "${cmd}" — Paste vào Telegram bot chính để tạo nội dung!`, 5000);
+}
+
+function copyImgCmd() {
+  const cat   = document.getElementById('img-cat').value;
+  const count = document.getElementById('img-count').value;
+  const cmd   = `/taoanh ${cat} ${count}`;
+  copyText(cmd);
+  showToast(`📋 Đã copy: "${cmd}" — Paste vào @luatdanhthi_images_bot!`, 5000);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function copyCmd(el) {
+  copyText(el.textContent.trim());
+  showToast('📋 Đã copy lệnh!');
+}
+function copyText(t) { navigator.clipboard.writeText(t).catch(()=>{}); }
+function showToast(msg, ms=3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(t._to);
+  t._to = setTimeout(()=>t.style.display='none', ms);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadStats();
+setInterval(loadStats, 3 * 60 * 1000);  // refresh mỗi 3 phút
+</script>
+</body>
+</html>

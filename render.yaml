@@ -1,0 +1,60 @@
+services:
+  - type: web
+    name: luatdanthi-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: RENDER_EXTERNAL_URL
+        fromService:
+          type: web
+          name: luatdanthi-bot
+          property: host
+      # Telegram
+      - key: MASTER_BOT_TOKEN
+        sync: false
+      - key: FACTORY_BOT_TOKEN
+        sync: false
+      - key: WEBHOOK_SECRET
+        value: luatdanthi2024
+      # Admin
+      - key: ADMIN_CHAT_ID
+        sync: false
+      # Facebook
+      - key: FB_PAGE_ID
+        sync: false
+      - key: FB_ACCESS_TOKEN
+        sync: false
+      # Anthropic Claude
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # SerpAPI
+      - key: SERPAPI_KEY
+        sync: false
+      # Cloudflare
+      - key: CF_ACCOUNT_ID
+        sync: false
+      - key: CF_API_TOKEN
+        sync: false
+      - key: CF_FLUX_MODEL
+        value: "@cf/black-forest-labs/flux-1-schnell"
+      # R2
+      - key: R2_ENDPOINT_URL
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        value: ldt-images
+      - key: R2_PUBLIC_URL
+        value: https://pub-3b8b5e8b6601441596c0a40d7f1d2ea0.r2.dev
+      # Google Sheets
+      - key: SPREADSHEET_ID
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      # Website
+      - key: WEBSITE_BASE
+        value: https://luatdanhthi.vn
