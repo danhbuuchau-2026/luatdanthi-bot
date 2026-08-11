@@ -271,8 +271,7 @@ async def check_viral(fb_text: str, label: str) -> int:
 async def post_to_facebook(caption: str, image_url: str | None) -> str | None:
     """Post lên Facebook, trả về post_id"""
     if not FB_PAGE_ID or not FB_ACCESS_TOKEN:
-        logger.error("Thiếu FB_PAGE_ID hoặc FB_ACCESS_TOKEN")
-        return None
+        raise Exception("Thiếu FB_PAGE_ID hoặc FB_ACCESS_TOKEN trong Render env vars")
 
     params = {
         "caption":      caption,
@@ -299,11 +298,13 @@ async def post_to_facebook(caption: str, image_url: str | None) -> str | None:
 
     data = r.json()
     if "error" in data:
-        logger.error("FB post error: %s", data["error"])
-        # Fallback: text only
+        err = data["error"]
+        logger.error("FB post error: %s", err)
+        # Fallback: text only nếu đang đăng kèm ảnh
         if image_url:
             return await post_to_facebook(caption, None)
-        return None
+        # Text-only cũng lỗi → raise để Telegram thấy lỗi thực
+        raise Exception(f"Facebook API lỗi {err.get('code','?')}: {err.get('message', str(err))}")
 
     return data.get("post_id") or data.get("id")
 
