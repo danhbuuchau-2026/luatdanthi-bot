@@ -330,14 +330,22 @@ async def run_master_v3(service: str, chat_id: str, bot_token: str):
         "Vui lòng chờ 2-4 phút.")
 
     try:
-        # 1. Lấy existing topics
-        existing = await get_topics(service)
+        # 1. Lấy existing topics (graceful — chạy được kể cả không có Sheets)
+        try:
+            existing = await get_topics(service)
+        except Exception as e:
+            logger.warning("get_topics failed (Sheets chưa cấu hình?): %s", e)
+            existing = []
 
         # 2. SerpAPI
         serp_summary = await get_serp_summary(cfg["serp_queries"])
 
-        # 3. FB Insights (AI learning)
-        insights = await get_fb_insights(service)
+        # 3. FB Insights (graceful)
+        try:
+            insights = await get_fb_insights(service)
+        except Exception as e:
+            logger.warning("get_fb_insights failed: %s", e)
+            insights = {}
 
         # 4. Chọn topic với Claude
         topic = await choose_topic(service, cfg, serp_summary, existing, insights)
@@ -349,15 +357,18 @@ async def run_master_v3(service: str, chat_id: str, bot_token: str):
             f"📊 Score: {topic['topic_score']} | Loại: {topic['content_type']}\n\n"
             "✍️ Đang viết bài...")
 
-        # 5. Lưu topic vào Sheets
-        await append_topics({**topic, "service": service, "created_at": today, "post_id": post_id})
+        # 5. Lưu topic vào Sheets (graceful)
+        try:
+            await append_topics({**topic, "service": service, "created_at": today, "post_id": post_id})
+        except Exception as e:
+            logger.warning("append_topics failed: %s", e)
 
         # 6. Viết bài với Claude
         content = await write_content(service, cfg, topic, insights)
 
         await tg_send(bot_token, chat_id,
             f"📝 <b>Bài đã viết</b> (Viral: {content['viral_score']}/100)\n\n"
-            f"🖼️ Đang chọn ảnh và đăng Facebook...")
+            f"🖼️ Đang tạo ảnh overlay và đăng Facebook...")
 
         # 7. Tạo ảnh text-overlay từ hook của bài viết
         hook_line = content.get("hook") or content["fb_text"].split('\n')[0]
@@ -366,48 +377,62 @@ async def run_master_v3(service: str, chat_id: str, bot_token: str):
         # Fallback: lấy từ thư viện nếu overlay fail
         img = None
         if not image_url:
-            img = await pick_image(service)
-            image_url = img["url"] if img else None
+            try:
+                img = await pick_image(service)
+                image_url = img["url"] if img else None
+            except Exception as e:
+                logger.warning("pick_image failed: %s", e)
+                img = None
 
         # 8. Post Facebook
         fb_post_id = await post_to_facebook(content["fb_text"], image_url)
 
         if fb_post_id:
             if img:
-                await update_image_used(img["id"])
+                try:
+                    await update_image_used(img["id"])
+                except Exception as e:
+                    logger.warning("update_image_used failed: %s", e)
 
-            # 9. Ghi Content sheet
-            await append_content({
-                "post_id":       post_id,
-                "service":       service,
-                "topic_keyword": topic["topic_keyword"],
-                "topic_title":   topic["topic_title"],
-                "topic_score":   topic["topic_score"],
-                "content_type":  topic["content_type"],
-                "facebook_text": content["fb_text"],
-                "viral_score":   content["viral_score"],
-                "image_id":      img["id"] if img else "",
-                "fb_post_id":    fb_post_id,
-                "created_at":    today,
-                "status":        "posted",
-            })
+            # 9. Ghi Content sheet (graceful)
+            try:
+                await append_content({
+                    "post_id":       post_id,
+                    "service":       service,
+                    "topic_keyword": topic["topic_keyword"],
+                    "topic_title":   topic["topic_title"],
+                    "topic_score":   topic["topic_score"],
+                    "content_type":  topic["content_type"],
+                    "facebook_text": content["fb_text"],
+                    "viral_score":   content["viral_score"],
+                    "image_id":      img["id"] if img else "",
+                    "fb_post_id":    fb_post_id,
+                    "created_at":    today,
+                    "status":        "posted",
+                })
+            except Exception as e:
+                logger.warning("append_content failed: %s", e)
 
-            # 10. Ghi FB Insights (0s vì vừa đăng)
-            await append_fb_insights({
-                "post_id":       post_id,
-                "service":       service,
-                "topic_keyword": topic["topic_keyword"],
-                "topic_score":   topic["topic_score"],
-                "viral_score":   content["viral_score"],
-                "created_at":    today,
-            })
+            # 10. Ghi FB Insights (graceful)
+            try:
+                await append_fb_insights({
+                    "post_id":       post_id,
+                    "service":       service,
+                    "topic_keyword": topic["topic_keyword"],
+                    "topic_score":   topic["topic_score"],
+                    "viral_score":   content["viral_score"],
+                    "created_at":    today,
+                })
+            except Exception as e:
+                logger.warning("append_fb_insights failed: %s", e)
 
+            img_status = "🖼️ overlay" if (image_url and not img) else ("🎨 thư viện" if img else "không có ảnh")
             await tg_send(bot_token, chat_id,
                 f"✅ <b>Đã đăng thành công!</b>\n\n"
                 f"📌 <b>{topic['topic_title']}</b>\n"
                 f"📊 Topic Score: {topic['topic_score']} | Viral: {content['viral_score']}/100\n"
                 f"🆔 Post ID: <code>{post_id}</code>\n"
-                f"🖼️ Ảnh: {'có' if image_url else 'không'}\n\n"
+                f"🖼️ Ảnh: {img_status}\n\n"
                 f"🔗 <a href='https://facebook.com/{fb_post_id}'>Xem bài đăng</a>")
         else:
             await tg_send(bot_token, chat_id,
