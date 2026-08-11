@@ -336,13 +336,27 @@ async def tg_send(token: str, chat_id, text: str, parse_mode="HTML"):
         )
 
 
+async def tg_send_photo(token: str, chat_id, photo_url: str, caption: str = ""):
+    """Gửi ảnh về Telegram — dùng khi Facebook fail"""
+    async with httpx.AsyncClient(timeout=30) as c:
+        await c.post(
+            f"https://api.telegram.org/bot{token}/sendPhoto",
+            json={
+                "chat_id":  chat_id,
+                "photo":    photo_url,
+                "caption":  caption[:1024],  # Telegram giới hạn 1024 ký tự caption
+            },
+        )
+
+
 # ── MAIN flow ─────────────────────────────────────────────────────────────────
 async def run_master_v3(service: str, chat_id: str, bot_token: str):
     cfg = SERVICE_CFG[service]
     now_vn = datetime.utcnow()  # Render UTC; VN = UTC+7
     today  = now_vn.strftime("%Y-%m-%d")
     post_id = f"LDT-{today.replace('-','')}-{service[:4].upper()}-{int(__import__('time').time())%10000}"
-    content = {}  # init sớm để error handler có thể dùng
+    content   = {}    # init sớm để error handler có thể dùng
+    image_url = None  # ảnh overlay, dùng trong error handler
 
     await tg_send(bot_token, chat_id,
         f"⏳ <b>Đang xử lý {cfg['label']}...</b>\n\n"
@@ -461,15 +475,18 @@ async def run_master_v3(service: str, chat_id: str, bot_token: str):
 
     except Exception as e:
         logger.error("run_master_v3 error: %s", e, exc_info=True)
-        err_msg = str(e)
-        fb_text = content.get("fb_text", "") if content else ""
-        # Nếu lỗi Facebook và đã có nội dung → gửi full text để copy-paste thủ công
+        err_msg   = str(e)
+        fb_text   = content.get("fb_text", "") if content else ""
+        # Nếu lỗi Facebook → gửi ảnh overlay + caption về Telegram để đăng thủ công
         if "Facebook API" in err_msg and fb_text:
             await tg_send(bot_token, chat_id,
-                f"❌ <b>Lỗi đăng Facebook:</b>\n<code>{err_msg[:200]}</code>\n\n"
-                f"📋 <b>Copy bài này đăng thủ công lên Facebook:</b>")
-            # Gửi bài viết riêng để dễ copy
-            await tg_send(bot_token, chat_id, fb_text, parse_mode="")
+                "⚠️ <b>Facebook chặn API — gửi ảnh + caption về đây để đăng thủ công:</b>")
+            if image_url:
+                # Gửi ảnh overlay kèm caption
+                await tg_send_photo(bot_token, chat_id, image_url, fb_text[:900])
+            else:
+                # Không có ảnh → gửi text
+                await tg_send(bot_token, chat_id, fb_text, parse_mode="")
         else:
             await tg_send(bot_token, chat_id,
                 f"❌ <b>Lỗi xử lý:</b>\n<code>{err_msg[:300]}</code>\n\n"
