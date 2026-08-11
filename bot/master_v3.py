@@ -281,29 +281,47 @@ async def post_to_facebook(caption: str, image_url: str | None) -> str | None:
 
     async with httpx.AsyncClient(timeout=30) as client:
         if image_url:
-            # Đăng kèm ảnh
-            params["url"] = image_url
+            # Đăng kèm ảnh qua /photos
+            photo_params = {
+                "url":          image_url,
+                "caption":      caption,
+                "published":    "true",
+                "access_token": FB_ACCESS_TOKEN,
+            }
             r = await client.post(
-                f"https://graph.facebook.com/v19.0/{FB_PAGE_ID}/photos",
-                data=params
+                f"https://graph.facebook.com/v21.0/{FB_PAGE_ID}/photos",
+                data=photo_params
             )
+            data = r.json()
+            if "error" in data:
+                logger.warning("Photo post failed, fallback to feed: %s", data["error"])
+                # Fallback: đăng text + link ảnh vào feed
+                feed_params = {
+                    "message":      caption + f"\n\n{image_url}",
+                    "published":    "true",
+                    "access_token": FB_ACCESS_TOKEN,
+                }
+                r = await client.post(
+                    f"https://graph.facebook.com/v21.0/{FB_PAGE_ID}/feed",
+                    data=feed_params
+                )
+                data = r.json()
         else:
             # Đăng text only
-            params["message"] = caption
-            del params["caption"]
+            feed_params = {
+                "message":      caption,
+                "published":    "true",
+                "access_token": FB_ACCESS_TOKEN,
+            }
             r = await client.post(
-                f"https://graph.facebook.com/v19.0/{FB_PAGE_ID}/feed",
-                data=params
+                f"https://graph.facebook.com/v21.0/{FB_PAGE_ID}/feed",
+                data=feed_params
             )
+            data = r.json()
 
-    data = r.json()
     if "error" in data:
         err = data["error"]
         logger.error("FB post error: %s", err)
-        # Fallback: text only nếu đang đăng kèm ảnh
-        if image_url:
-            return await post_to_facebook(caption, None)
-        # Text-only cũng lỗi → raise để Telegram thấy lỗi thực
         raise Exception(f"Facebook API lỗi {err.get('code','?')}: {err.get('message', str(err))}")
 
     return data.get("post_id") or data.get("id")
@@ -324,6 +342,7 @@ async def run_master_v3(service: str, chat_id: str, bot_token: str):
     now_vn = datetime.utcnow()  # Render UTC; VN = UTC+7
     today  = now_vn.strftime("%Y-%m-%d")
     post_id = f"LDT-{today.replace('-','')}-{service[:4].upper()}-{int(__import__('time').time())%10000}"
+    content = {}  # init sớm để error handler có thể dùng
 
     await tg_send(bot_token, chat_id,
         f"⏳ <b>Đang xử lý {cfg['label']}...</b>\n\n"
@@ -442,6 +461,16 @@ async def run_master_v3(service: str, chat_id: str, bot_token: str):
 
     except Exception as e:
         logger.error("run_master_v3 error: %s", e, exc_info=True)
-        await tg_send(bot_token, chat_id,
-            f"❌ <b>Lỗi xử lý:</b>\n<code>{str(e)[:300]}</code>\n\n"
-            "Thử lại sau vài phút.")
+        err_msg = str(e)
+        fb_text = content.get("fb_text", "") if content else ""
+        # Nếu lỗi Facebook và đã có nội dung → gửi full text để copy-paste thủ công
+        if "Facebook API" in err_msg and fb_text:
+            await tg_send(bot_token, chat_id,
+                f"❌ <b>Lỗi đăng Facebook:</b>\n<code>{err_msg[:200]}</code>\n\n"
+                f"📋 <b>Copy bài này đăng thủ công lên Facebook:</b>")
+            # Gửi bài viết riêng để dễ copy
+            await tg_send(bot_token, chat_id, fb_text, parse_mode="")
+        else:
+            await tg_send(bot_token, chat_id,
+                f"❌ <b>Lỗi xử lý:</b>\n<code>{err_msg[:300]}</code>\n\n"
+                "Thử lại sau vài phút.")
