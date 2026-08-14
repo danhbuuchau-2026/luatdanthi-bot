@@ -119,11 +119,20 @@ def make_overlay_image(
     font_hook  = _get_font(90, condensed=True)
     font_cta   = _get_font(36)
 
-    # 3. Làm sạch hook text
+    # 3. Làm sạch hook text — cắt tại ngắt tự nhiên để ảnh không bị dở dang
     hook = hook_text.strip().split('\n')[0].strip()
     hook = hook.lstrip('🔥⚡💥❗❓👉📌⚠️✅•-–— ').strip()
-    if len(hook) > 70:
-        hook = hook[:67] + "..."
+    if len(hook) > 55:
+        # Ưu tiên cắt tại dấu phẩy đầu tiên nếu có trong 55 ký tự đầu
+        comma_pos = hook[:60].rfind(',')
+        period_pos = hook[:60].rfind('.')
+        cut = max(comma_pos, period_pos)
+        if cut > 20:
+            hook = hook[:cut].rstrip('.,').strip()
+        else:
+            # Không có dấu câu phù hợp → cắt theo từ
+            words = hook[:55].rsplit(' ', 1)
+            hook = words[0].strip()
 
     # 4. Brand ở trên (vàng, căn giữa)
     brand_text = f"CÔNG TY {brand.upper()}"
