@@ -159,7 +159,7 @@ def make_overlay_image(
     draw.rectangle([(W // 2 - 55, div_y), (W // 2 + 55, div_y + 4)], fill=GOLD)
 
     # 7. CTA text (vàng, căn giữa)
-    cta = "Nhắn tin để được tư vấn miễn phí"
+    cta = "Nhắn tin để được tư vấn ngay"
     bb  = draw.textbbox((0, 0), cta, font=font_cta)
     draw.text(((W - (bb[2] - bb[0])) // 2, div_y + 18), cta, font=font_cta, fill=GOLD)
 
