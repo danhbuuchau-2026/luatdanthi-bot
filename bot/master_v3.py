@@ -504,16 +504,15 @@ async def run_master_v3(service: str, chat_id: str, bot_token: str):
         # Nếu lỗi Facebook → gửi ảnh overlay + caption về Telegram để đăng thủ công
         if "Facebook API" in err_msg and fb_text:
             await tg_send(bot_token, chat_id,
-                "⚠️ <b>Facebook chặn API — lưu ảnh + caption này rồi đăng lên Facebook:</b>")
+                "⚠️ <b>Facebook chặn API — lưu ảnh + bài này rồi đăng lên Facebook:</b>")
             if image_url:
-                # Có R2 URL → gửi qua URL (nhanh hơn)
-                await tg_send_photo(bot_token, chat_id, image_url, fb_text[:900])
+                # Có R2 URL → gửi ảnh qua URL (không caption để tránh giới hạn 1024 ký tự)
+                await tg_send_photo(bot_token, chat_id, image_url, caption="")
             elif overlay_bytes:
-                # Không có R2 URL → gửi bytes trực tiếp qua Telegram
-                await tg_send_photo_bytes(bot_token, chat_id, overlay_bytes, fb_text[:900])
-            else:
-                # Không tạo được ảnh → gửi text
-                await tg_send(bot_token, chat_id, fb_text, parse_mode="")
+                # Không có R2 URL → gửi bytes trực tiếp (không caption)
+                await tg_send_photo_bytes(bot_token, chat_id, overlay_bytes, caption="")
+            # Luôn gửi full text riêng để không bị cắt
+            await tg_send(bot_token, chat_id, fb_text, parse_mode="")
         else:
             await tg_send(bot_token, chat_id,
                 f"❌ <b>Lỗi xử lý:</b>\n<code>{err_msg[:300]}</code>\n\n"
