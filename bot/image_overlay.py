@@ -205,6 +205,21 @@ async def upload_overlay_to_r2(img_bytes: bytes, service: str) -> str:
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+async def generate_overlay_bytes(
+    hook_text: str,
+    service:   str = "ly_hon",
+    brand:     str = "Luật Danh Thị",
+) -> bytes | None:
+    """Tạo overlay image bytes — không upload R2. Dùng để gửi qua Telegram multipart."""
+    try:
+        await ensure_fonts()
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, make_overlay_image, hook_text, service, brand)
+    except Exception as e:
+        logger.error("❌ generate_overlay_bytes error: %s", e, exc_info=True)
+        return None
+
+
 async def generate_and_upload_overlay(
     hook_text: str,
     service:   str = "ly_hon",

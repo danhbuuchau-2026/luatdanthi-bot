@@ -17,7 +17,7 @@ from services.sheets import (
     pick_image, update_image_used,
     append_content, append_fb_insights,
 )
-from bot.image_overlay import generate_and_upload_overlay
+from bot.image_overlay import generate_and_upload_overlay, generate_overlay_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -338,15 +338,25 @@ async def tg_send(token: str, chat_id, text: str, parse_mode="HTML"):
 
 
 async def tg_send_photo(token: str, chat_id, photo_url: str, caption: str = ""):
-    """Gửi ảnh về Telegram — dùng khi Facebook fail"""
+    """Gửi ảnh từ URL về Telegram"""
     async with httpx.AsyncClient(timeout=30) as c:
         await c.post(
             f"https://api.telegram.org/bot{token}/sendPhoto",
             json={
                 "chat_id":  chat_id,
                 "photo":    photo_url,
-                "caption":  caption[:1024],  # Telegram giới hạn 1024 ký tự caption
+                "caption":  caption[:1024],
             },
+        )
+
+
+async def tg_send_photo_bytes(token: str, chat_id, photo_bytes: bytes, caption: str = ""):
+    """Gửi ảnh từ bytes về Telegram (multipart) — không cần R2"""
+    async with httpx.AsyncClient(timeout=60) as c:
+        await c.post(
+            f"https://api.telegram.org/bot{token}/sendPhoto",
+            data={"chat_id": str(chat_id), "caption": caption[:1024]},
+            files={"photo": ("overlay.jpg", photo_bytes, "image/jpeg")},
         )
 
 
@@ -356,8 +366,9 @@ async def run_master_v3(service: str, chat_id: str, bot_token: str):
     now_vn = datetime.utcnow()  # Render UTC; VN = UTC+7
     today  = now_vn.strftime("%Y-%m-%d")
     post_id = f"LDT-{today.replace('-','')}-{service[:4].upper()}-{int(__import__('time').time())%10000}"
-    content   = {}    # init sớm để error handler có thể dùng
-    image_url = None  # ảnh overlay, dùng trong error handler
+    content       = {}    # init sớm để error handler có thể dùng
+    image_url     = None  # URL R2 (cho Facebook)
+    overlay_bytes = None  # Raw bytes (fallback Telegram — không cần R2)
 
     await tg_send(bot_token, chat_id,
         f"⏳ <b>Đang xử lý {cfg['label']}...</b>\n\n"
@@ -407,11 +418,23 @@ async def run_master_v3(service: str, chat_id: str, bot_token: str):
 
         # 7. Tạo ảnh text-overlay từ hook của bài viết
         hook_line = content.get("hook") or content["fb_text"].split('\n')[0]
-        image_url = await generate_and_upload_overlay(hook_line, service)
 
-        # Fallback: lấy từ thư viện nếu overlay fail
+        # Bước 7a: Tạo bytes (luôn chạy — không cần R2)
+        overlay_bytes = await generate_overlay_bytes(hook_line, service)
+
+        # Bước 7b: Upload R2 để lấy URL (cho Facebook)
+        image_url = None
+        if overlay_bytes:
+            try:
+                from bot.image_overlay import upload_overlay_to_r2
+                image_url = await upload_overlay_to_r2(overlay_bytes, service)
+                logger.info("✅ Overlay uploaded to R2: %s", image_url)
+            except Exception as r2_err:
+                logger.warning("R2 upload failed (sẽ dùng bytes qua Telegram): %s", r2_err)
+
+        # Fallback: lấy ảnh từ thư viện nếu overlay fail hoàn toàn
         img = None
-        if not image_url:
+        if not image_url and not overlay_bytes:
             try:
                 img = await pick_image(service)
                 image_url = img["url"] if img else None
@@ -481,12 +504,15 @@ async def run_master_v3(service: str, chat_id: str, bot_token: str):
         # Nếu lỗi Facebook → gửi ảnh overlay + caption về Telegram để đăng thủ công
         if "Facebook API" in err_msg and fb_text:
             await tg_send(bot_token, chat_id,
-                "⚠️ <b>Facebook chặn API — gửi ảnh + caption về đây để đăng thủ công:</b>")
+                "⚠️ <b>Facebook chặn API — lưu ảnh + caption này rồi đăng lên Facebook:</b>")
             if image_url:
-                # Gửi ảnh overlay kèm caption
+                # Có R2 URL → gửi qua URL (nhanh hơn)
                 await tg_send_photo(bot_token, chat_id, image_url, fb_text[:900])
+            elif overlay_bytes:
+                # Không có R2 URL → gửi bytes trực tiếp qua Telegram
+                await tg_send_photo_bytes(bot_token, chat_id, overlay_bytes, fb_text[:900])
             else:
-                # Không có ảnh → gửi text
+                # Không tạo được ảnh → gửi text
                 await tg_send(bot_token, chat_id, fb_text, parse_mode="")
         else:
             await tg_send(bot_token, chat_id,
