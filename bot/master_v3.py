@@ -204,7 +204,7 @@ async def write_content(service: str, cfg: dict, topic: dict, insights: list) ->
         learning_txt,
         f"CTA: {cfg['cta']}",
         f"Hashtags: {cfg['hashtags']}",
-        "Độ dài: 380-500 ký tự (không tính hashtag)",
+        "Độ dài: 800-1200 ký tự (không tính hashtag). Kể câu chuyện đủ ý, đủ cảm xúc.",
         "",
         "OUTPUT FORMAT:",
         "TITLE: (tiêu đề)",
@@ -223,7 +223,7 @@ async def write_content(service: str, cfg: dict, topic: dict, insights: list) ->
         f"Lý do viral: {topic['search_reason']}"
     )
 
-    raw = await call_claude(system, user, max_tokens=1500)
+    raw = await call_claude(system, user, max_tokens=2500)
 
     # Extract FACEBOOK_TEXT
     m = re.search(r"FACEBOOK_TEXT_START\s*(.*?)\s*FACEBOOK_TEXT_END", raw, re.DOTALL)
